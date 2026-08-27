@@ -1,0 +1,424 @@
+local scripturl = "https://raw.githubusercontent.com/killequeen126-sudo/ssb/refs/heads/main/guide/1234"
+
+if game.GameId ~= 2380077519 and game.PlaceId ~= 18550498098 then
+    return
+end
+
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+
+local ps = game:GetService("Players")
+local ws = workspace
+local rf = game:GetService("ReplicatedFirst")
+local rs = game:GetService("ReplicatedStorage")
+local bs = game:GetService("BadgeService")
+local ts = game:GetService("TeleportService")
+local lp = ps.LocalPlayer
+local queueteleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
+
+if game.PlaceId ~= 18550498098 then
+    local Window = Library:CreateWindow({
+        Title = 'Where Guide Resides | by liaqe',
+        Center = true,
+        AutoShow = true,
+        TabPadding = 8,
+        MenuFadeTime = 0.2
+    })
+
+    if Window.Frame then
+        Window.Frame.Size = UDim2.new(0, 550, 0, 400)
+    end
+
+    local Tabs = {
+        Teleport = Window:AddTab('teleport'),
+        ['UI Settings'] = Window:AddTab('UI Settings')
+    }
+
+    local teleportgroup = Tabs.Teleport:AddLeftGroupbox('Where Guide Resides')
+
+    teleportgroup:AddButton({
+        Text = 'teleport to place',
+        Func = function()
+            if queueteleport then 
+                queueteleport([[
+                    repeat task.wait() until game:IsLoaded()
+                    loadstring(game:HttpGet("]] .. scripturl .. [["))()
+                ]]) 
+            end 
+            pcall(function()
+                (lp.Character or lp.CharacterAdded:Wait()):PivotTo(ws.BountyHunterRoom.Build:GetChildren()[27]["Meshes/boxshadow_Cube.005"].Hitbox.CFrame)
+            end)
+        end,
+        DoubleClick = false
+    })
+
+    ThemeManager:SetLibrary(Library)
+    ThemeManager:SetFolder('WhereGuideResides')
+    ThemeManager:ApplyToTab(Tabs['UI Settings'])
+
+    Library:OnUnload(function()
+        Library.Unloaded = true
+    end)
+
+    return
+end
+
+local Window = Library:CreateWindow({
+    Title = 'Where Guide Resides | by liaqe',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+if Window.Frame then
+    Window.Frame.Size = UDim2.new(0, 550, 0, 400)
+end
+
+local Tabs = {
+    Main = Window:AddTab('main'),
+    ['UI Settings'] = Window:AddTab('UI Settings')
+}
+
+local badgegroup = Tabs.Main:AddLeftGroupbox('badge')
+local othergroup = Tabs.Main:AddRightGroupbox('other')
+
+badgegroup:AddToggle('collectrandhp', {
+    Text = 'cube regeneration and +1hp',
+    Default = false
+})
+
+badgegroup:AddDropdown('selectbadge', {
+    Values = { 'Relude', 'Hunter' },
+    Default = 1,
+    Multi = false,
+    Text = 'choose a glove what you want'
+})
+
+badgegroup:AddDivider()
+
+othergroup:AddToggle('antiafk', {
+    Text = 'anti-afk',
+    Default = true
+})
+
+othergroup:AddToggle('nocutscenes', {
+    Text = 'destroy all cutscenes',
+    Default = true
+})
+
+othergroup:AddToggle('kickafter', {
+    Text = 'kick after receiving',
+    Default = true
+})
+
+local Configs = {
+    collectrandhp = false,
+    selectbadge = 'Relude'
+}
+
+Toggles.collectrandhp:OnChanged(function()
+    Configs.collectrandhp = Toggles.collectrandhp.Value
+end)
+
+Options.selectbadge:OnChanged(function()
+    Configs.selectbadge = Options.selectbadge.Value
+end)
+
+local function updateafk()
+    if Toggles.antiafk.Value then
+        for _, c in next, getconnections(lp.Idled) do
+            c:Disable()
+        end
+    else
+        for _, c in next, getconnections(lp.Idled) do
+            c:Enable()
+        end
+    end
+end
+
+Toggles.antiafk:OnChanged(updateafk)
+task.spawn(updateafk)
+
+local cutscenebackup = nil
+local assetsfolder = rf:WaitForChild("Assets", 5)
+
+local function updatecutscenes()
+    local shouldDestroy = Toggles.nocutscenes.Value
+    if shouldDestroy then
+        if assetsfolder and assetsfolder:FindFirstChild("Cutscenes") then
+            cutscenebackup = assetsfolder.Cutscenes:Clone()
+            assetsfolder.Cutscenes:Destroy()
+        end
+    else
+        if cutscenebackup and assetsfolder and not assetsfolder:FindFirstChild("Cutscenes") then
+            local restored = cutscenebackup:Clone()
+            restored.Parent = assetsfolder
+        end
+    end
+end
+
+Toggles.nocutscenes:OnChanged(updatecutscenes)
+task.spawn(updatecutscenes)
+
+local badgeavatar = 4414076328730650
+local badgerelude = 154204790800271
+local badgehunter = 3483144763925839
+
+local initA, initR, initH = false, false, false
+task.spawn(function()
+    pcall(function() initA = bs:UserHasBadgeAsync(lp.UserId, badgeavatar) end)
+    pcall(function() initR = bs:UserHasBadgeAsync(lp.UserId, badgerelude) end)
+    pcall(function() initH = bs:UserHasBadgeAsync(lp.UserId, badgehunter) end)
+end)
+
+local function getbadges()
+    local a, r, h = false, false, false
+    pcall(function() a = bs:UserHasBadgeAsync(lp.UserId, badgeavatar) end)
+    pcall(function() r = bs:UserHasBadgeAsync(lp.UserId, badgerelude) end)
+    pcall(function() h = bs:UserHasBadgeAsync(lp.UserId, badgehunter) end)
+    return a, r, h
+end
+
+local kicking = false
+local endReached = false
+
+local function triggerEndKick()
+    if endReached or not Toggles.kickafter.Value then return end
+    endReached = true
+    
+    task.spawn(function()
+        local timer = 0
+        while timer < 30 and not kicking do
+            task.wait(1)
+            timer = timer + 1
+        end
+        
+        if not kicking and Toggles.kickafter.Value then
+            kicking = true
+            lp:Kick("you already have a glove (gloves)")
+        end
+    end)
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if Toggles.kickafter.Value and not kicking then
+            local cura, curr, curh = getbadges()
+            local newa = cura and not initA
+            local newr = curr and not initR
+            local newh = curh and not initH
+
+            if newa or newr or newh then
+                kicking = true
+                task.wait(1.5)
+                
+                cura, curr, curh = getbadges()
+                newa = cura and not initA
+                newr = curr and not initR
+                newh = curh and not initH
+
+                local reason = ""
+                if newa and newr then
+                    reason = "you got the avatar and relude glove"
+                elseif newa and newh then
+                    reason = "you got the avatar and hunter glove"
+                elseif newa then
+                    reason = "you got the avatar glove"
+                elseif newr then
+                    reason = "you got the relude glove"
+                elseif newh then
+                    reason = "you got the hunter glove"
+                end
+                lp:Kick(reason ~= "" and reason or "you got a glove")
+                break
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    local remotes = rs:WaitForChild("Remotes", 10)
+    local visuals = remotes and remotes:WaitForChild("Visuals", 10)
+    local endcut = visuals and visuals:WaitForChild("EndCutsceneIdle", 10)
+    if endcut then
+        endcut.OnClientEvent:Connect(function(mode)
+            if mode == "Eliminate" or mode == nil then
+                triggerEndKick()
+            end
+        end)
+    end
+end)
+
+local function start()
+    if _G.running then 
+        Library:Notify("error", 3)
+        return 
+    end
+    
+    _G.running = true
+
+    task.spawn(function()
+        task.spawn(function()
+            local pgui = lp:WaitForChild("PlayerGui")
+            local function cleancutscenes()
+                if Library.Unloaded or not _G.running then return end
+                local cine = pgui:FindFirstChild("cine") or pgui:FindFirstChild("Cutscene")
+                if cine then cine:Destroy() end
+                local sgui = pgui:FindFirstChild("ScreenGui")
+                if sgui and sgui:FindFirstChild("BlackBars") then sgui.BlackBars:Destroy() end
+                if ws.CurrentCamera.CameraType ~= Enum.CameraType.Custom then
+                    ws.CurrentCamera.CameraType = Enum.CameraType.Custom
+                    ws.CurrentCamera.CameraSubject = lp.Character:FindFirstChild("Humanoid")
+                end
+            end
+            pgui.ChildAdded:Connect(cleancutscenes)
+            ws.CurrentCamera:GetPropertyChangedSignal("CameraType"):Connect(cleancutscenes)
+        end)
+
+        if ws:FindFirstChild('VoidPart') == nil then 
+            local aa = Instance.new('Part', ws)
+            aa.Position = Vector3.new(538, 55, -231)
+            aa.Name = 'VoidPart'
+            aa.Size = Vector3.new(2048, 11, 2048)
+            aa.Anchored = true 
+            aa.Transparency = 1 
+            aa.CanCollide = true 
+
+            local ab = Instance.new('Part', aa)
+            ab.Position = Vector3.new(595, 120, -330)
+            ab.Name = 'Safe'
+            ab.Size = Vector3.new(2000, 10, 2000)
+            ab.Anchored = true 
+            ab.Transparency = 0.5 
+            ab.CanCollide = true 
+        end
+
+        local function hrp()
+            local char = lp.Character or lp.CharacterAdded:Wait()
+            return char:WaitForChild("HumanoidRootPart")
+        end
+
+        local function slapglove(target)
+            local char = lp.Character
+            local inventory = lp.Backpack
+            if not char or not target then return end
+            if inventory:FindFirstChild('Lantern') then 
+                inventory:FindFirstChild('Lantern').Parent = char 
+            end
+            if char:FindFirstChild('Lantern') and char.Lantern:FindFirstChild('Network') then 
+                char.Lantern:Activate()
+                char.Lantern.Network:FireServer('Hit', target) 
+            end
+        end
+
+        local function getgas()
+            local count = 0
+            local pipes = ws:FindFirstChild("DecontaminationPipes")
+            if pipes then
+                for _, pipe in pairs(pipes:GetChildren()) do
+                    if pipe.Name == "pipe" and pipe:FindFirstChild("default") then
+                        count = count + #pipe.default:GetChildren()
+                    end
+                end
+            end
+            return count
+        end
+
+        hrp().CFrame = CFrame.new(3258, -68, 823)
+        task.wait(2)
+
+        if Configs.collectrandhp then
+            if ws:FindFirstChild('the cube of life') and ws['the cube of life']:FindFirstChild('Part') then
+                hrp().CFrame = ws['the cube of life'].Part.CFrame
+            end
+            task.wait(0.5)
+            if ws:FindFirstChild('Big Heart') then
+                hrp().CFrame = ws['Big Heart'].CFrame
+            end
+            task.wait(1)
+            if ws:FindFirstChild('ShackLever') and ws.ShackLever:FindFirstChild('Base') then
+                hrp().CFrame = ws.ShackLever.Base.CFrame
+            end
+            task.wait(0.5)
+        end
+
+        for _, item in pairs(ws:GetDescendants()) do
+            if item.Name == 'ShackLever' and item:FindFirstChild('ClickDetector') then
+                fireclickdetector(item.ClickDetector, 0)
+                fireclickdetector(item.ClickDetector, 1)
+            end
+        end
+
+        repeat task.wait(0.1) until getgas() > 0 or Library.Unloaded or not _G.running
+        repeat task.wait(0.1) until getgas() == 0 or Library.Unloaded or not _G.running
+        task.wait(0.3)
+
+        if Library.Unloaded or not _G.running then return end
+
+        if ws.VoidPart:FindFirstChild('Safe') then 
+            hrp().CFrame = ws.VoidPart.Safe.CFrame * CFrame.new(0, 25, 0) 
+        end
+
+        task.spawn(function()
+            while task.wait(0.3) do
+                if Library.Unloaded or not _G.running then break end
+                local pgui = lp:FindFirstChild("PlayerGui")
+                if pgui and pgui:FindFirstChild("Component") and pgui.Component:FindFirstChild("SpareGuidePrompt") then
+                    local prompt = pgui.Component.SpareGuidePrompt
+                    local targetbutton = (Configs.selectbadge == 'Relude') and prompt:FindFirstChild("Yes") or prompt:FindFirstChild("No")
+                    
+                    if targetbutton then
+                        if firebutton1click then
+                            pcall(function() firebutton1click(targetbutton) end)
+                        elseif firesignal then
+                            pcall(function() firesignal(targetbutton.MouseButton1Click) end)
+                            pcall(function() firesignal(targetbutton.Activated) end)
+                        elseif getconnections then
+                            pcall(function()
+                                for _, c in pairs(getconnections(targetbutton.MouseButton1Click)) do c:Fire() end
+                                for _, c in pairs(getconnections(targetbutton.Activated)) do c:Fire() end
+                            end)
+                        end
+                    end
+                end
+            end
+        end)
+
+        while task.wait() do
+            if Library.Unloaded or not _G.running then break end
+            for _, item in pairs(ws:GetChildren()) do
+                if item.Name:lower() == 'trackglovemissile' then slapglove(item) end
+            end
+            if ws:FindFirstChild('GuideNPC') and ws.GuideNPC:FindFirstChild('HumanoidRootPart') then 
+                slapglove(ws.GuideNPC.HumanoidRootPart) 
+            end
+            for _, item in pairs(ws:GetChildren()) do
+                if item.Name:lower() == 'replicanpc' and item:FindFirstChild('HumanoidRootPart') then slapglove(item.HumanoidRootPart) end
+            end
+            for _, item in pairs(ws:GetChildren()) do
+                if item.Name:lower() == 'golem' or item.Name:lower() == 'dungeongolem' then 
+                    local targetpart = item:FindFirstChild('Hitbox') or item:FindFirstChild('Cube.001')
+                    if targetpart then slapglove(targetpart) end
+                end
+            end
+        end
+    end)
+end
+
+badgegroup:AddButton({
+    Text = 'start',
+    Func = start,
+    DoubleClick = false
+})
+
+ThemeManager:SetLibrary(Library)
+ThemeManager:SetFolder('WhereGuideResides')
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+
+Library:OnUnload(function()
+    _G.running = false
+    Library.Unloaded = true
+end)
