@@ -1,6 +1,6 @@
 local scripturl = "https://raw.githubusercontent.com/killequeen126-sudo/ssb/refs/heads/main/guide/1234"
 
-if game.GameId ~= 2380077519 and game.PlaceId ~= 18550498098 then
+if game.PlaceId ~= 6403373529 and game.PlaceId ~= 18550498098 then
     return
 end
 
