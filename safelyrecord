@@ -1,0 +1,582 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+
+local LP = Players.LocalPlayer
+local PlayerGui = LP:WaitForChild("PlayerGui")
+local UserId = LP.UserId
+local MyUserIdStr = tostring(UserId)
+local MyEntryName = "PlayerEntry_" .. MyUserIdStr
+local MyName = LP.Name
+local MyDisplayName = LP.DisplayName
+
+local math_random = math.random
+local math_sin = math.sin
+local math_cos = math.cos
+local math_clamp = math.clamp
+local os_clock = os.clock
+local Color3_fromHSV = Color3.fromHSV
+local str_find = string.find
+local str_gsub = string.gsub
+local str_lower = string.lower
+
+local UPDATE_INTERVAL = 0.015
+local lastUpdateTime = 0
+
+local CurrentValues = {
+	Name = "9672",
+	Slaps = "4932",
+	SlapsNum = 4932,
+	Glove = "9052",
+	Overhead = "9843",
+	Tool = "9052",
+	DropDownDisplay = "9672",
+	DropDownUser = "user_9672",
+}
+
+local function generateRandomValues()
+	local nName = tostring(math_random(1000, 9999))
+	local nSlaps = math_random(1000, 9999)
+	local nGlove = tostring(math_random(1000, 9999))
+	local nOverhead = tostring(math_random(1000, 9999))
+	local nTool = tostring(math_random(1000, 9999))
+
+	CurrentValues.Name = nName
+	CurrentValues.SlapsNum = nSlaps
+	CurrentValues.Slaps = tostring(nSlaps)
+	CurrentValues.Glove = nGlove
+	CurrentValues.Overhead = nOverhead
+	CurrentValues.Tool = nTool
+	CurrentValues.DropDownDisplay = nName
+	CurrentValues.DropDownUser = "user_" .. nName
+end
+generateRandomValues()
+
+local function getWaveColor(phaseOffset)
+	local t = (os_clock() * 3.0) + ((phaseOffset or 0) * 1.2)
+	local hue = 0.51 + 0.17 * (math_sin(t) * 0.5 + 0.5)
+	local sat = 0.65 + 0.35 * math_cos(t * 0.9)
+	local val = 0.85 + 0.15 * math_sin(t * 1.3)
+	return Color3_fromHSV(math_clamp(hue, 0.50, 0.68), math_clamp(sat, 0.55, 1), math_clamp(val, 0.75, 1))
+end
+
+local CachedGui = {
+	TabEntry = nil,
+	TabNameLabels = {},
+	TabSlapLabel = nil,
+	TabGloveLabel = nil,
+	DropDownAvatar = nil,
+	DropDownDisplay = nil,
+	DropDownUser = nil,
+	InspectBtn = nil,
+	OverheadLabels = {},
+	CharacterParts = {},
+}
+
+local function cleanOverheadIcons(char)
+	if not char then return end
+	for _, item in ipairs(char:GetDescendants()) do
+		if item:IsA("ImageLabel") or item:IsA("ImageButton") then
+			pcall(function()
+				item.Visible = false
+				item.ImageTransparency = 1
+				item:Destroy()
+			end)
+		end
+	end
+end
+
+local function applyBlockySkin(char)
+	if not char then return end
+	local skinCol = getWaveColor(12.0)
+
+	for _, item in ipairs(char:GetChildren()) do
+		if item:IsA("Accessory") or item:IsA("Clothing") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
+			pcall(function()
+				if item:IsA("Accessory") then
+					local handle = item:FindFirstChild("Handle")
+					if handle then handle.Transparency = 1 end
+					item:Destroy()
+				else
+					item:Destroy()
+				end
+			end)
+		elseif item:IsA("CharacterMesh") then
+			pcall(function() item:Destroy() end)
+		elseif item:IsA("BasePart") then
+			if item.Name == "Head" then
+				local mesh = item:FindFirstChildOfClass("SpecialMesh")
+				if mesh then
+					mesh.MeshType = Enum.MeshType.Head
+					mesh.TextureId = ""
+				end
+				local face = item:FindFirstChild("face")
+				if face then face.Transparency = 1 end
+			end
+			item.Material = Enum.Material.SmoothPlastic
+			item.Color = skinCol
+		end
+	end
+end
+
+local function hookCharacter(char)
+	if not char then return end
+
+	CachedGui.OverheadLabels = {}
+	CachedGui.CharacterParts = {}
+
+	applyBlockySkin(char)
+	cleanOverheadIcons(char)
+
+	for _, item in ipairs(char:GetDescendants()) do
+		if item:IsA("ImageLabel") or item:IsA("ImageButton") then
+			pcall(function()
+				item.Visible = false
+				item.ImageTransparency = 1
+				item:Destroy()
+			end)
+		elseif item:IsA("BillboardGui") and (str_find(str_lower(item.Name), "slap") or str_find(str_lower(item.Name), "gain") or str_find(str_lower(item.Name), "pop") or str_find(str_lower(item.Name), "count")) then
+			item.Enabled = false
+			pcall(function() item:Destroy() end)
+		elseif item:IsA("TextLabel") then
+			table.insert(CachedGui.OverheadLabels, item)
+		elseif item:IsA("BasePart") then
+			table.insert(CachedGui.CharacterParts, item)
+		end
+	end
+
+	char.DescendantAdded:Connect(function(child)
+		if child:IsA("Accessory") or child:IsA("Clothing") or child:IsA("ShirtGraphic") or child:IsA("BodyColors") or child:IsA("CharacterMesh") then
+			task.defer(function()
+				pcall(function()
+					if child:IsA("Accessory") then
+						local handle = child:FindFirstChild("Handle")
+						if handle then handle.Transparency = 1 end
+					end
+					child:Destroy()
+				end)
+			end)
+		elseif child:IsA("Decal") and child.Name == "face" then
+			task.defer(function()
+				pcall(function() child.Transparency = 1 end)
+			end)
+		elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
+			task.defer(function()
+				pcall(function()
+					child.Visible = false
+					child.ImageTransparency = 1
+					child:Destroy()
+				end)
+			end)
+		elseif child:IsA("BillboardGui") then
+			task.defer(function()
+				for _, sub in ipairs(child:GetDescendants()) do
+					if sub:IsA("TextLabel") and (str_find(sub.Text, "%+") or str_find(str_lower(sub.Text), "slap") or str_find(str_lower(sub.Text), "gain")) then
+						child.Enabled = false
+						child:Destroy()
+						break
+					end
+				end
+			end)
+		elseif child:IsA("TextLabel") then
+			table.insert(CachedGui.OverheadLabels, child)
+		elseif child:IsA("BasePart") then
+			child.Material = Enum.Material.SmoothPlastic
+			table.insert(CachedGui.CharacterParts, child)
+		end
+	end)
+end
+
+if LP.Character then hookCharacter(LP.Character) end
+LP.CharacterAdded:Connect(hookCharacter)
+LP.CharacterAppearanceLoaded:Connect(hookCharacter)
+
+pcall(function()
+	Workspace.DescendantAdded:Connect(function(child)
+		if child:IsA("BillboardGui") then
+			task.defer(function()
+				for _, sub in ipairs(child:GetDescendants()) do
+					if sub:IsA("TextLabel") and (str_find(sub.Text, "%+") or str_find(str_lower(sub.Text), "slap") or str_find(str_lower(sub.Text), "gain")) then
+						child.Enabled = false
+						child:Destroy()
+						break
+					end
+				end
+			end)
+		end
+	end)
+end)
+
+local function sanitizeBadgeLabel(item)
+	if not item:IsA("TextLabel") then return end
+	local txt = item.Text
+	if not txt or txt == "" then return end
+	if str_find(txt, MyName, 1, true) or str_find(txt, MyDisplayName, 1, true) or str_find(txt, "dante", 1, true) then
+		local newTxt = str_gsub(txt, MyName, CurrentValues.Name)
+		newTxt = str_gsub(newTxt, MyDisplayName, CurrentValues.Name)
+		newTxt = str_gsub(newTxt, "dante", CurrentValues.Name)
+		item.Text = newTxt
+		item.TextColor3 = getWaveColor(1.5)
+	end
+end
+
+pcall(function()
+	CoreGui.DescendantAdded:Connect(function(child)
+		if child:IsA("TextLabel") then
+			task.defer(function()
+				sanitizeBadgeLabel(child)
+				child:GetPropertyChangedSignal("Text"):Connect(function()
+					sanitizeBadgeLabel(child)
+				end)
+			end)
+		elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
+			task.defer(function()
+				if str_find(tostring(child.Image or ""), MyUserIdStr, 1, true) then
+					child.ImageTransparency = 1
+					child.Visible = false
+				end
+			end)
+		end
+	end)
+end)
+
+local function hideSlapCounterGuiElement(item)
+	local name = str_lower(item.Name)
+	if str_find(name, "slapcounter") or str_find(name, "slap_counter") or str_find(name, "slapcount") or str_find(name, "slapmeter") or (str_find(name, "counter") and item.Parent and str_find(str_lower(item.Parent.Name), "slap")) then
+		pcall(function()
+			if item:IsA("ScreenGui") then
+				item.Enabled = false
+			elseif item:IsA("GuiObject") then
+				item.Visible = false
+			end
+		end)
+	end
+
+	if item:IsA("TextLabel") then
+		local txt = item.Text or ""
+		local lTxt = str_lower(txt)
+		if str_find(txt, "%+") or str_find(lTxt, "slaps%s*enabled") or str_find(lTxt, "slap%s*enabled") or str_find(lTxt, "%dx") or str_find(lTxt, "x%d") or str_find(lTxt, "multiplier") then
+			item.Visible = false
+			item.TextTransparency = 1
+		elseif str_find(name, "slap") and str_find(name, "counter") then
+			item.Visible = false
+			item.TextTransparency = 1
+		end
+	elseif item:IsA("ImageLabel") or item:IsA("ImageButton") then
+		if str_find(name, "slap") and (str_find(name, "hand") or str_find(name, "icon") or str_find(name, "meter") or str_find(name, "counter")) then
+			item.Visible = false
+			item.ImageTransparency = 1
+		end
+	end
+end
+
+local function cleanAllSlapCounters()
+	for _, item in ipairs(PlayerGui:GetDescendants()) do
+		hideSlapCounterGuiElement(item)
+		if item:IsA("TextLabel") then
+			local txt = item.Text or ""
+			if txt == MyName or txt == MyDisplayName or txt == "dante" or str_find(txt, MyName, 1, true) or str_find(txt, MyDisplayName, 1, true) then
+				item.Text = CurrentValues.Name
+				item.TextColor3 = getWaveColor(1.5)
+			elseif str_find(str_lower(txt), "glove:", 1, true) or str_find(str_lower(txt), "equipped:", 1, true) then
+				item.Text = "Glove: " .. CurrentValues.Glove
+				item.TextColor3 = getWaveColor(1.5)
+			end
+		end
+	end
+end
+cleanAllSlapCounters()
+
+pcall(function()
+	PlayerGui.DescendantAdded:Connect(function(child)
+		task.defer(function()
+			hideSlapCounterGuiElement(child)
+			if child:IsA("TextLabel") then
+				child:GetPropertyChangedSignal("Text"):Connect(function()
+					hideSlapCounterGuiElement(child)
+				end)
+			end
+		end)
+	end)
+end)
+
+local function rebuildTabCache()
+	pcall(function()
+		local pList = CoreGui:FindFirstChild("PlayerList")
+		if not pList then return end
+
+		local scroll = pList:FindFirstChild("OffsetUndoFrame", true) or pList:FindFirstChild("ScrollingFrame", true) or pList
+		for _, entry in ipairs(scroll:GetDescendants()) do
+			if entry:IsA("Frame") and entry.Name == MyEntryName then
+				CachedGui.TabEntry = entry
+				CachedGui.TabNameLabels = {}
+
+				local nameFrame = entry:FindFirstChild("NameFrame", true)
+				if nameFrame then
+					for _, sub in ipairs(nameFrame:GetDescendants()) do
+						if sub:IsA("TextLabel") then
+							table.insert(CachedGui.TabNameLabels, sub)
+						elseif sub:IsA("ImageLabel") or sub:IsA("ImageButton") then
+							sub.Visible = false
+							sub.ImageTransparency = 1
+						end
+					end
+				else
+					for _, sub in ipairs(entry:GetDescendants()) do
+						if sub:IsA("TextLabel") and (sub.Name == "PlayerName" or sub.Text == "dante" or sub.Text == MyDisplayName or sub.Text == MyName) then
+							table.insert(CachedGui.TabNameLabels, sub)
+						elseif sub:IsA("ImageLabel") or sub:IsA("ImageButton") then
+							sub.Visible = false
+							sub.ImageTransparency = 1
+						end
+					end
+				end
+
+				local statSlaps = entry:FindFirstChild("GameStat_Slaps", true)
+				if statSlaps then
+					for _, sub in ipairs(statSlaps:GetDescendants()) do
+						if sub:IsA("TextLabel") then
+							sub.TextXAlignment = Enum.TextXAlignment.Center
+							sub.AutomaticSize = Enum.AutomaticSize.None
+							CachedGui.TabSlapLabel = sub
+							break
+						end
+					end
+				end
+
+				local statGlove = entry:FindFirstChild("GameStat_Glove", true)
+				if statGlove then
+					for _, sub in ipairs(statGlove:GetDescendants()) do
+						if sub:IsA("TextLabel") then
+							sub.TextXAlignment = Enum.TextXAlignment.Center
+							sub.AutomaticSize = Enum.AutomaticSize.None
+							CachedGui.TabGloveLabel = sub
+							break
+						end
+					end
+				end
+				break
+			end
+		end
+
+		local dropDown = pList:FindFirstChild("PlayerDropDown", true)
+		if dropDown then
+			local header = dropDown:FindFirstChild("PlayerHeader", true)
+			if header then
+				CachedGui.DropDownAvatar = header:FindFirstChild("AvatarImage", true)
+				local textContainer = header:FindFirstChild("TextContainerFrame", true)
+				if textContainer then
+					CachedGui.DropDownDisplay = textContainer:FindFirstChild("DisplayName", true)
+					CachedGui.DropDownUser = textContainer:FindFirstChild("PlayerName", true)
+				end
+			end
+			CachedGui.InspectBtn = dropDown:FindFirstChild("InspectButton", true)
+		end
+	end)
+end
+rebuildTabCache()
+
+local function scanAndSpoofEscMenu()
+	pcall(function()
+		local inGameMenu = CoreGui:FindFirstChild("InGameMenu") or CoreGui:FindFirstChild("RobloxGui")
+		if not inGameMenu then return end
+
+		for _, item in ipairs(inGameMenu:GetDescendants()) do
+			if item:IsA("ImageLabel") or item:IsA("ImageButton") then
+				local img = tostring(item.Image or "")
+				if str_find(img, MyUserIdStr, 1, true) then
+					item.ImageTransparency = 1
+					item.Visible = false
+				end
+			elseif item:IsA("Frame") or item:IsA("CanvasGroup") then
+				local isLocalCard = false
+				for _, sub in ipairs(item:GetChildren()) do
+					if sub:IsA("TextLabel") and (sub.Text == CurrentValues.Name or sub.Text == "@" .. CurrentValues.Name or sub.Text == MyName or sub.Text == MyDisplayName or sub.Text == "@" .. MyName) then
+						isLocalCard = true
+						break
+					end
+				end
+				if not isLocalCard then
+					for _, sub in ipairs(item:GetDescendants()) do
+						if sub:IsA("TextLabel") and (sub.Text == CurrentValues.Name or sub.Text == "@" .. CurrentValues.Name or sub.Text == MyName or sub.Text == MyDisplayName or sub.Text == "@" .. MyName) then
+							isLocalCard = true
+							break
+						end
+					end
+				end
+
+				if isLocalCard then
+					for _, sub in ipairs(item:GetDescendants()) do
+						if (sub:IsA("ImageLabel") or sub:IsA("ImageButton")) and (str_find(str_lower(sub.Name), "avatar") or str_find(str_lower(sub.Name), "head") or str_find(str_lower(sub.Name), "thumbnail") or str_find(tostring(sub.Image), MyUserIdStr)) then
+							sub.ImageTransparency = 1
+							sub.Visible = false
+						elseif sub:IsA("ViewportFrame") then
+							sub.Visible = false
+						end
+					end
+				end
+			end
+		end
+	end)
+end
+
+local function updateFastSpoof()
+	local cName = getWaveColor(3.0)
+	local cSlaps = getWaveColor(4.5)
+	local cGlove = getWaveColor(6.0)
+	local cTool = getWaveColor(12.0)
+
+	local sValName = CurrentValues.Name
+	local sValSlaps = CurrentValues.Slaps
+	local sValGlove = CurrentValues.Glove
+	local sValOverhead = CurrentValues.Overhead
+	local sValTool = CurrentValues.Tool
+
+	local myLs = LP:FindFirstChild("leaderstats")
+	if myLs then
+		local sObj = myLs:FindFirstChild("Slaps")
+		if sObj then
+			pcall(function()
+				if sObj:IsA("IntValue") or sObj:IsA("NumberValue") then sObj.Value = CurrentValues.SlapsNum
+				elseif sObj:IsA("StringValue") then sObj.Value = sValSlaps end
+			end)
+		end
+		local gObj = myLs:FindFirstChild("Glove")
+		if gObj and gObj:IsA("StringValue") then
+			pcall(function() gObj.Value = sValGlove end)
+		end
+	end
+
+	local eq = LP:FindFirstChild("Equipped")
+	if eq and eq:IsA("StringValue") then
+		pcall(function() eq.Value = sValTool end)
+	end
+	local ib = LP:FindFirstChild("ItemsBag")
+	if ib then
+		for _, item in ipairs(ib:GetChildren()) do
+			pcall(function() item.Name = sValTool end)
+		end
+	end
+
+	local backpack = LP:FindFirstChildOfClass("Backpack")
+	if backpack then
+		for _, tool in ipairs(backpack:GetChildren()) do
+			pcall(function()
+				if tool.Name ~= sValTool then tool.Name = sValTool end
+				if tool:IsA("Tool") then tool.ToolTip = sValTool end
+			end)
+		end
+	end
+
+	local char = LP.Character
+	if char then
+		for _, item in ipairs(char:GetChildren()) do
+			if item:IsA("Accessory") or item:IsA("Clothing") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") or item:IsA("CharacterMesh") then
+				pcall(function() item:Destroy() end)
+			elseif item:IsA("Tool") then
+				pcall(function()
+					if item.Name ~= sValTool then item.Name = sValTool end
+					item.ToolTip = sValTool
+				end)
+				for _, part in ipairs(item:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Color = cTool
+						part.Material = Enum.Material.SmoothPlastic
+					end
+				end
+			elseif item:IsA("BasePart") then
+				item.Material = Enum.Material.SmoothPlastic
+				item.Color = cTool
+				if item.Name == "Head" then
+					local face = item:FindFirstChild("face")
+					if face then face.Transparency = 1 end
+				end
+			end
+		end
+	end
+
+	for i = #CachedGui.CharacterParts, 1, -1 do
+		local p = CachedGui.CharacterParts[i]
+		if p and p.Parent then
+			p.Color = cTool
+			p.Material = Enum.Material.SmoothPlastic
+		else
+			table.remove(CachedGui.CharacterParts, i)
+		end
+	end
+
+	for i = #CachedGui.OverheadLabels, 1, -1 do
+		local lbl = CachedGui.OverheadLabels[i]
+		if lbl and lbl.Parent then
+			local txt = lbl.Text
+			if str_find(txt, "%+") then
+				lbl.Visible = false
+			elseif txt == MyName or txt == MyDisplayName or str_find(txt, MyName, 1, true) or str_find(txt, MyDisplayName, 1, true) or tonumber(txt) ~= nil or txt == "dante" then
+				lbl.Text = sValOverhead
+				lbl.TextColor3 = cName
+			end
+		else
+			table.remove(CachedGui.OverheadLabels, i)
+		end
+	end
+
+	if not CachedGui.TabEntry or not CachedGui.TabEntry.Parent then
+		rebuildTabCache()
+	end
+
+	if CachedGui.TabEntry and CachedGui.TabEntry.Parent then
+		if CachedGui.TabEntry.LayoutOrder ~= 2147483647 then
+			CachedGui.TabEntry.LayoutOrder = 2147483647
+		end
+
+		for _, lbl in ipairs(CachedGui.TabNameLabels) do
+			if lbl and lbl.Parent then
+				lbl.Text = sValName
+				lbl.TextColor3 = cName
+			end
+		end
+
+		if CachedGui.TabSlapLabel and CachedGui.TabSlapLabel.Parent then
+			CachedGui.TabSlapLabel.Text = sValSlaps
+			CachedGui.TabSlapLabel.TextColor3 = cSlaps
+		end
+
+		if CachedGui.TabGloveLabel and CachedGui.TabGloveLabel.Parent then
+			CachedGui.TabGloveLabel.Text = sValGlove
+			CachedGui.TabGloveLabel.TextColor3 = cGlove
+		end
+	end
+
+	if CachedGui.DropDownAvatar and CachedGui.DropDownAvatar.Parent then
+		CachedGui.DropDownAvatar.ImageTransparency = 1
+		CachedGui.DropDownAvatar.BackgroundTransparency = 1
+	end
+	if CachedGui.DropDownDisplay and CachedGui.DropDownDisplay.Parent then
+		CachedGui.DropDownDisplay.Text = CurrentValues.DropDownDisplay
+		CachedGui.DropDownDisplay.TextColor3 = getWaveColor(7.5)
+	end
+	if CachedGui.DropDownUser and CachedGui.DropDownUser.Parent then
+		CachedGui.DropDownUser.Text = "@" .. CurrentValues.DropDownUser
+		CachedGui.DropDownUser.TextColor3 = getWaveColor(9.0)
+	end
+	if CachedGui.InspectBtn and CachedGui.InspectBtn.Parent then
+		CachedGui.InspectBtn.Visible = false
+	end
+end
+
+local lastEscScan = 0
+RunService.RenderStepped:Connect(function()
+	local now = os_clock()
+	if now - lastUpdateTime >= UPDATE_INTERVAL then
+		lastUpdateTime = now
+		generateRandomValues()
+	end
+
+	updateFastSpoof()
+
+	if now - lastEscScan >= 0.5 then
+		lastEscScan = now
+		scanAndSpoofEscMenu()
+	end
+end)
